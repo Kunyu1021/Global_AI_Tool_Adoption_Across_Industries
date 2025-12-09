@@ -63,17 +63,20 @@ ORDER BY avg_adoption DESC;
 
 E. 高级分析
 -- 5. 识别高增长潜力行业
-SELECT 
-    industry,
-    ai_tool,
-    adoption_rate,
-    daily_active_users,
-    ROUND(
-        adoption_rate * daily_active_users * 1.0 / 
-        (SUM(adoption_rate * daily_active_users) OVER (PARTITION BY industry) + 0.001),
-        4
-    ) as industry_share
-FROM ai_adoption
-WHERE year = 2024
-QUALIFY ROW_NUMBER() OVER (PARTITION BY industry ORDER BY adoption_rate DESC) <= 3
+SELECT * FROM (
+    SELECT 
+        industry,
+        ai_tool,
+        adoption_rate,
+        daily_active_users,
+        ROUND(
+            adoption_rate * daily_active_users * 1.0 / 
+            SUM(adoption_rate * daily_active_users) OVER (PARTITION BY industry),
+            4
+        ) as industry_share,
+        ROW_NUMBER() OVER (PARTITION BY industry ORDER BY adoption_rate DESC) as rank
+    FROM ai_adoption
+    WHERE year = 2024
+) 
+WHERE rank <= 3
 ORDER BY industry, adoption_rate DESC;
