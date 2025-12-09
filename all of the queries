@@ -1,0 +1,79 @@
+A. 探索性分析
+1. 各AI工具的整体采用率对比
+SELECT 
+    ai_tool,
+    COUNT(*) as usage_count,
+    ROUND(AVG(adoption_rate), 2) as avg_adoption_rate,
+    SUM(daily_active_users) as total_active_users
+FROM ai_adoption
+GROUP BY ai_tool
+ORDER BY avg_adoption_rate DESC;
+
+B. 趋势分析
+-- 2. 各行业AI采用趋势（2023 vs 2024）
+WITH yearly_stats AS (
+    SELECT 
+        industry,
+        year,
+        ROUND(AVG(adoption_rate), 2) as avg_rate,
+        LAG(ROUND(AVG(adoption_rate), 2)) OVER (PARTITION BY industry ORDER BY year) as prev_year_rate
+    FROM ai_adoption
+    GROUP BY industry, year
+)
+SELECT 
+    industry,
+    year,
+    avg_rate,
+    prev_year_rate,
+    ROUND((avg_rate - COALESCE(prev_year_rate, 0)) / COALESCE(prev_year_rate, 1) * 100, 2) as growth_percentage
+FROM yearly_stats
+ORDER BY growth_percentage DESC;
+
+C. 细分洞察
+-- 3. 不同公司规模对AI工具偏好分析
+SELECT 
+    company_size,
+    ai_tool,
+    COUNT(*) as count,
+    ROUND(AVG(adoption_rate), 2) as avg_adoption,
+    ROUND(AVG(daily_active_users), 0) as avg_daily_users,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY company_size), 2) as tool_percentage
+FROM ai_adoption
+GROUP BY company_size, ai_tool
+ORDER BY company_size, avg_adoption DESC;
+
+D. 区域分析
+-- 4. 区域AI成熟度分析
+SELECT 
+    CASE 
+        WHEN country IN ('USA', 'Canada') THEN '北美'
+        WHEN country IN ('UK', 'France', 'Germany') THEN '欧洲'
+        WHEN country IN ('China', 'South Korea', 'India') THEN '亚洲'
+        WHEN country IN ('Australia') THEN '大洋洲'
+        WHEN country IN ('Brazil') THEN '南美'
+        ELSE '其他'
+    END as region,
+    COUNT(*) as total_records,
+    ROUND(AVG(adoption_rate), 2) as avg_adoption,
+    SUM(daily_active_users) as total_users,
+    COUNT(DISTINCT ai_tool) as tools_used
+FROM ai_adoption
+GROUP BY region
+ORDER BY avg_adoption DESC;
+
+E. 高级分析
+-- 5. 识别高增长潜力行业
+SELECT 
+    industry,
+    ai_tool,
+    adoption_rate,
+    daily_active_users,
+    ROUND(
+        adoption_rate * daily_active_users * 1.0 / 
+        (SUM(adoption_rate * daily_active_users) OVER (PARTITION BY industry) + 0.001),
+        4
+    ) as industry_share
+FROM ai_adoption
+WHERE year = 2024
+QUALIFY ROW_NUMBER() OVER (PARTITION BY industry ORDER BY adoption_rate DESC) <= 3
+ORDER BY industry, adoption_rate DESC;
